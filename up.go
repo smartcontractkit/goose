@@ -11,25 +11,35 @@ func UpTo(db *sql.DB, dir string, version int64) error {
 		return err
 	}
 
-	for {
-		current, err := GetDBVersion(db)
-		if err != nil {
-			return err
-		}
+	// ensure the db table exists
+	if _, err := EnsureDBVersion(db); err != nil {
+		return err
+	}
 
-		next, err := migrations.Next(current)
-		if err != nil {
-			if err == ErrNoNextVersion {
-				log.Printf("goose: no migrations to run. current version: %d\n", current)
-				return nil
+	records, err := GetDBRecords(db)
+	if err != nil {
+		return err
+	}
+
+	OUTER:
+	for _, migration := range migrations {
+		// skip existing migrations
+		for _, record := range records {
+			if record.VersionID == migration.Version {
+				continue OUTER
 			}
-			return err
 		}
-
-		if err = next.Up(db); err != nil {
+		if err = migration.Up(db); err != nil {
 			return err
 		}
 	}
+
+	current, err := GetDBVersion(db)
+	if err != nil {
+		return err
+	}
+	log.Printf("goose: no more migrations to run. current version: %d\n", current)
+	return nil
 }
 
 // Up applies all available migrations.

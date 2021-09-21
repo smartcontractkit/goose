@@ -321,3 +321,23 @@ func GetDBVersion(db *sql.DB) (int64, error) {
 
 	return version, nil
 }
+
+func GetDBRecords(db *sql.DB) ([]MigrationRecord, error) {
+	var records []MigrationRecord
+	rows, err := GetDialect().dbVersionQuery(db)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var record MigrationRecord
+		if err := rows.Scan(&record.VersionID, &record.IsApplied); err != nil {
+			return nil, err
+		}
+		records = append(records, record)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return records, nil
+}
